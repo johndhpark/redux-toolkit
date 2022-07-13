@@ -6,6 +6,7 @@ import {
   isAnyOf,
   isFulfilled,
   isRejectedWithValue,
+  current,
 } from '@reduxjs/toolkit'
 import type {
   CombinedState as CombinedQueryState,
@@ -22,7 +23,7 @@ import type {
   ConfigState,
 } from './apiState'
 import { QueryStatus } from './apiState'
-import type { MutationThunk, QueryThunk } from './buildThunks'
+import type { MutationThunk, QueryThunk, RejectedAction } from './buildThunks'
 import { calculateProvidedByThunk } from './buildThunks'
 import type {
   AssertTagTypes,
@@ -356,7 +357,37 @@ export function buildSlice({
         }: PayloadAction<{ requestId: string } & QuerySubstateIdentifier>
       ) {
         if (draft[queryCacheKey]) {
+          console.log('Removing subscription: ', queryCacheKey, current(draft))
           delete draft[queryCacheKey]![requestId]
+        }
+      },
+      subscriptionRequestsRejected(
+        draft,
+        action: PayloadAction<RejectedAction<QueryThunk, any>[]>
+      ) {
+        // We need to process "rejected" actions caused by a component trying to start a subscription
+        // after there's already a cache entry. Since many components may mount at once and all want
+        // the same data, we use a middleware that intercepts those actions batches these together
+        // into a single larger action , and we'll process all of them at once.
+        for (let rejectedAction of action.payload) {
+          const {
+            meta: { condition, arg, requestId },
+            error,
+            payload,
+          } = rejectedAction
+          // request was aborted due to condition (another query already running)
+          if (condition && arg.subscribe) {
+            // console.log('Adding subscription: ', payload, arg)
+            console.log(
+              'Adding subscription via rejection: ',
+              arg,
+              payload,
+              current(draft)
+            )
+            const substate = (draft[arg.queryCacheKey] ??= {})
+            substate[requestId] =
+              arg.subscriptionOptions ?? substate[requestId] ?? {}
+          }
         }
       },
     },
@@ -370,11 +401,17 @@ export function buildSlice({
         )
         .addCase(queryThunk.pending, (draft, { meta: { arg, requestId } }) => {
           if (arg.subscribe) {
+            console.log(
+              'Adding subscription via pending: ',
+              arg.queryCacheKey,
+              current(draft)
+            )
             const substate = (draft[arg.queryCacheKey] ??= {})
             substate[requestId] =
               arg.subscriptionOptions ?? substate[requestId] ?? {}
           }
         })
+        /*
         .addCase(
           queryThunk.rejected,
           (draft, { meta: { condition, arg, requestId }, error, payload }) => {
@@ -386,6 +423,7 @@ export function buildSlice({
             }
           }
         )
+        */
         // update the state to be a new object to be picked up as a "state change"
         // by redux-persist's `autoMergeLevel2`
         .addMatcher(hasRehydrationInfo, (draft) => ({ ...draft }))

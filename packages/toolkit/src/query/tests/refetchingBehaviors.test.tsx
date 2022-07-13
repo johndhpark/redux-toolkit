@@ -348,10 +348,13 @@ describe('refetchOnReconnect tests', () => {
       expect(screen.getByTestId('amount').textContent).toBe('1')
     )
 
+    console.log('Toggling online/offline')
     act(() => {
       window.dispatchEvent(new Event('offline'))
       window.dispatchEvent(new Event('online'))
     })
+
+    console.log('Toggling complete')
 
     await waitFor(() =>
       expect(screen.getByTestId('isFetching').textContent).toBe('true')

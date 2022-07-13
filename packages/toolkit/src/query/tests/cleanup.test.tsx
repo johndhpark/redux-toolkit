@@ -3,7 +3,7 @@
 import React from 'react'
 
 import { createApi, QueryStatus } from '@reduxjs/toolkit/query/react'
-import { render, waitFor } from '@testing-library/react'
+import { render, waitFor, act } from '@testing-library/react'
 import { setupApiStore } from './helpers'
 
 const api = createApi({
@@ -90,11 +90,15 @@ test('data stays in store when component stays rendered while data for another c
 
   const statusA = getSubStateA()
 
-  rerender(
-    <>
-      <UsingA />
-    </>
-  )
+  await act(async () => {
+    rerender(
+      <>
+        <UsingA />
+      </>
+    )
+
+    jest.advanceTimersByTime(10)
+  })
 
   jest.advanceTimersByTime(120000)
 
@@ -102,7 +106,11 @@ test('data stays in store when component stays rendered while data for another c
   expect(getSubStateB()).toBeUndefined()
 })
 
-test('data stays in store when one component requiring the data stays in the store', async () => {
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+test.only('data stays in store when one component requiring the data stays in the store', async () => {
   expect(getSubStateA()).toBeUndefined()
   expect(getSubStateB()).toBeUndefined()
 
@@ -121,13 +129,25 @@ test('data stays in store when one component requiring the data stays in the sto
   const statusA = getSubStateA()
   const statusB = getSubStateB()
 
-  rerender(
-    <>
-      <UsingAB />
-    </>
-  )
+  await act(async () => {
+    rerender(
+      <>
+        <UsingAB />
+      </>
+    )
+    jest.advanceTimersByTime(10)
+    // await delay(25) // Promise.resolve()
+    jest.runAllTimers()
+  })
 
-  jest.advanceTimersByTime(120000)
+  console.log('SubstateB before timers: ', getSubStateB())
+  await act(async () => {
+    jest.advanceTimersByTime(120000)
+    jest.runAllTimers()
+  })
+  console.log('SubstateB after timers: ', getSubStateB())
+
+  // console.log('SubstateA after resolve: ', getSubStateA())
 
   expect(getSubStateA()).toEqual(statusA)
   expect(getSubStateB()).toEqual(statusB)

@@ -556,3 +556,7 @@ test('mutation types', () => {
     }),
   })
 })
+
+process.on('unhandledRejection', (e: any) => {
+  console.error('Unhandled promise rejection: ', e)
+})

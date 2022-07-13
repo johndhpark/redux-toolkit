@@ -20,6 +20,7 @@ export const build: SubMiddlewareBuilder = ({
         refetchValidQueries(mwApi, 'refetchOnFocus')
       }
       if (onOnline.match(action)) {
+        console.log('Trying to refetch queries for online')
         refetchValidQueries(mwApi, 'refetchOnReconnect')
       }
 
